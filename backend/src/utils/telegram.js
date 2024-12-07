@@ -5,6 +5,8 @@ const crypto = require("crypto-browserify");
 // Environment variables
 const CHANNEL_USERNAME = process.env.CHANNEL_USERNAME || "@hackintown";
 const BOT_USERNAME = process.env.BOT_USERNAME || "HackintownBot";
+const WITHDRAWAL_THRESHOLD = process.env.WITHDRAWAL_THRESHOLD || 100;
+const MAX_REWARD = process.env.MAX_REWARD || 100;
 
 const bot = new TelegramBot(process.env.TELEGRAM_TOKEN, { polling: false });
 
@@ -28,11 +30,14 @@ bot.onText(/\/start(?: (.+))?/, async (msg, match) => {
         referredBy: referralCode
           ? (await User.findOne({ referralCode }))?.telegramId
           : null,
+        totalEarnings: 0,
+        channelJoined: false,
       });
 
+      // Referrer details
       if (user.referredBy) {
         const referrer = await User.findOne({ telegramId: user.referredBy });
-        if (referrer) {
+        if (referrer && !referrer.referredUsers.includes(chatId)) {
           referrer.spins += 1;
           referrer.referredUsers.push(chatId);
           await referrer.save();
@@ -63,6 +68,7 @@ bot.onText(/\/start(?: (.+))?/, async (msg, match) => {
   }
 });
 
+// Handle callback queries
 bot.on("callback_query", async (callbackQuery) => {
   const chatId = callbackQuery.message.chat.id;
   const data = callbackQuery.data;
@@ -114,17 +120,7 @@ bot.on("callback_query", async (callbackQuery) => {
         break;
 
       case "withdraw":
-        if (user.totalEarnings >= 100) {
-          bot.sendMessage(
-            chatId,
-            "Enter your UPI ID (format: upi <your-upi-id>)"
-          );
-        } else {
-          bot.sendMessage(
-            chatId,
-            `You need ₹100 to withdraw. Current balance: ₹${user.totalEarnings}`
-          );
-        }
+        handleWithdraw(chatId, user);
         break;
     }
   } catch (error) {
@@ -133,6 +129,7 @@ bot.on("callback_query", async (callbackQuery) => {
   }
 });
 
+// Verify channel membership
 async function verifyMembership(chatId) {
   try {
     const res = await bot.getChatMember(CHANNEL_USERNAME, chatId);
@@ -146,6 +143,7 @@ async function verifyMembership(chatId) {
   }
 }
 
+// Handle spinning logic
 const handleSpin = async (chatId, user) => {
   if (!user.channelJoined) {
     bot.sendMessage(chatId, "Please join our channel first!");
@@ -163,6 +161,7 @@ const handleSpin = async (chatId, user) => {
   const winAmount = calculateWinAmount(user.spins);
   user.spins -= 1;
   user.totalEarnings += winAmount;
+  user.totalEarnings = Math.min(user.totalEarnings, MAX_REWARD); // Cap rewards
   await user.save();
 
   bot.sendMessage(
@@ -189,6 +188,19 @@ const calculateWinAmount = (remainingSpins) => {
   return Math.floor(Math.random() * (config.max - config.min + 1)) + config.min;
 };
 
+// Handle withdrawal logic
+const handleWithdraw = async (chatId, user) => {
+  if (user.totalEarnings >= WITHDRAWAL_THRESHOLD) {
+    bot.sendMessage(chatId, "Enter your UPI ID (format: upi <your-upi-id>)");
+  } else {
+    bot.sendMessage(
+      chatId,
+      `You need ₹${WITHDRAWAL_THRESHOLD} to withdraw. Current balance: ₹${user.totalEarnings}`
+    );
+  }
+};
+
+// Handle UPI submission
 bot.onText(/^upi (.+)$/, async (msg, match) => {
   const chatId = msg.chat.id;
   const upiId = match[1];
@@ -200,18 +212,33 @@ bot.onText(/^upi (.+)$/, async (msg, match) => {
   }
 
   const user = await User.findOne({ telegramId: chatId });
-  if (user && user.totalEarnings >= 100) {
+  if (user && user.totalEarnings >= WITHDRAWAL_THRESHOLD) {
     user.withdrawalRequests.push({ amount: user.totalEarnings, upiId });
     user.totalEarnings = 0;
     await user.save();
 
     bot.sendMessage(
       chatId,
-      "✅ Withdrawal request submitted!\nWe'll process it within 24 hours."
+      "✅ Withdrawal request submitted! We'll process it within 24 hours."
     );
   } else {
     bot.sendMessage(chatId, "You need at least ₹100 to withdraw.");
   }
+});
+
+// Leaderboard functionality
+bot.onText(/\/leaderboard/, async (msg) => {
+  const chatId = msg.chat.id;
+  const topReferrers = await User.find().sort({ referredUsers: -1 }).limit(10);
+
+  let leaderboard = "🏆 Top Referrers 🏆\n\n";
+  topReferrers.forEach((user, index) => {
+    leaderboard += `${index + 1}. @${user.username || "Anonymous"} - ${
+      user.referredUsers.length
+    } referrals\n`;
+  });
+
+  bot.sendMessage(chatId, leaderboard);
 });
 
 module.exports = bot;
