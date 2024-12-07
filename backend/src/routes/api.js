@@ -1,6 +1,7 @@
 const express = require("express");
 const User = require("../models/User");
 const Joi = require("joi");
+const { verifyMembership } = require("../utils/telegram");
 const router = express.Router();
 
 // Base route to verify API status

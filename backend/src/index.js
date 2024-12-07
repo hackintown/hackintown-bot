@@ -3,6 +3,7 @@ const express = require("express"); // Framework for handling HTTP requests
 const connectDB = require("./config/db"); // Database connection function
 const bot = require("./utils/telegram"); // Telegram bot setup
 const apiRoutes = require("./routes/api"); // Import API routes
+const cors = require("cors"); // Middleware for Cross-Origin Resource Sharing
 
 const app = express();
 
@@ -11,7 +12,7 @@ connectDB();
 
 // Middleware for parsing JSON
 app.use(express.json());
-
+app.use(cors({ origin: process.env.CLIENT_URL || "http://localhost:3000" }));
 // API Routes (e.g., /api/users, /api/spins, etc.)
 app.use("/api", apiRoutes);
 
@@ -30,6 +31,11 @@ app.post("/telegram", (req, res) => {
 // Default Route for Health Check
 app.get("/", (req, res) => {
   res.send("Server is running. API and Telegram bot are ready!");
+});
+
+// Fallback Route for Unmatched Endpoints
+app.use((req, res, next) => {
+  res.status(404).json({ message: "Route not found" });
 });
 
 // Start the Server

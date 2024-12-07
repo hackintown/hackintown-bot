@@ -3,7 +3,8 @@ import Header from "./components/Header";
 import SpinWheel from "./components/SpinWheel";
 import ReferralSection from "./components/ReferralSection";
 import ProgressBar from "./components/ProgressBar";
-
+import API_BASE_URL from "./config/api";
+import Loading from "./components/Loading";
 const App = () => {
   const [user, setUser] = useState(null);
   const [error, setError] = useState(null);
@@ -13,7 +14,9 @@ const App = () => {
   useEffect(() => {
     const verifyChannelMembership = async (telegramId) => {
       try {
-        const res = await fetch(`/api/verify-channel/${telegramId}`);
+        const res = await fetch(
+          `${API_BASE_URL}/api/verify-channel/${telegramId}`
+        );
         const data = await res.json();
         setChannelJoined(data.isChannelMember);
       } catch (err) {
@@ -43,7 +46,7 @@ const App = () => {
 
   const fetchUserData = async (telegramId) => {
     try {
-      const res = await fetch(`/api/user/${telegramId}`);
+      const res = await fetch(`${API_BASE_URL}/api/user/${telegramId}`);
       if (!res.ok) throw new Error("Failed to fetch user data.");
       const data = await res.json();
       setUser(data);
@@ -56,7 +59,7 @@ const App = () => {
 
   const handleSpin = async (reward) => {
     try {
-      const res = await fetch("/api/spin", {
+      const res = await fetch(`${API_BASE_URL}/api/spin`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ telegramId: user.telegramId, reward }),
@@ -70,7 +73,7 @@ const App = () => {
     }
   };
 
-  if (loading) return <div>Loading...</div>;
+  if (loading) return <Loading />;
 
   return (
     <div className="min-h-screen bg-gray-100">

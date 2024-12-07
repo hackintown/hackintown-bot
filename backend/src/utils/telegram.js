@@ -14,6 +14,15 @@ bot.on("error", (error) => {
 });
 
 const generateReferralCode = () => crypto.randomBytes(4).toString("hex");
+const generateUniqueReferralCode = async () => {
+  let code;
+  let exists;
+  do {
+    code = generateReferralCode();
+    exists = await User.findOne({ referralCode: code });
+  } while (exists);
+  return code;
+};
 
 const handleReferral = async (newUser, referrerCode) => {
   try {
@@ -90,7 +99,7 @@ bot.onText(/\/start(?: (.+))?/, async (msg, match) => {
       user = new User({
         telegramId: chatId,
         username: msg.from.username || "",
-        referralCode: generateReferralCode(),
+        referralCode: await generateUniqueReferralCode(),
         spins: 3,
         channelJoined: false,
       });
@@ -104,13 +113,13 @@ bot.onText(/\/start(?: (.+))?/, async (msg, match) => {
 
     // Welcome message with referral link
     const welcomeMessage = `
-Welcome to Spin & Win! 🎰
+        Welcome to Spin & Win! 🎰
 
-${referralCode ? "🎯 You were invited by a friend!" : ""}
-Your unique referral link:
-https://t.me/${BOT_USERNAME}?start=${user.referralCode}
+        ${referralCode ? "🎯 You were invited by a friend!" : ""}
+        Your unique referral link:
+        https://t.me/${BOT_USERNAME}?start=${user.referralCode}
 
-Share this link with friends and earn 1 free spin for each friend who joins! 🎁
+        Share this link with friends and earn 1 free spin for each friend who joins! 🎁
     `;
 
     bot.sendMessage(chatId, welcomeMessage, {
