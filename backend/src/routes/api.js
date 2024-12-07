@@ -91,4 +91,23 @@ router.post("/withdraw", async (req, res) => {
   }
 });
 
+// Add to existing routes
+router.get("/verify-channel/:telegramId", async (req, res) => {
+  try {
+    const user = await User.findOne({ telegramId: req.params.telegramId });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const isMember = await verifyMembership(req.params.telegramId);
+    user.channelJoined = isMember;
+    await user.save();
+
+    res.json({ isChannelMember: isMember });
+  } catch (error) {
+    console.error("Error verifying channel membership:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 module.exports = router;

@@ -8,6 +8,24 @@ const App = () => {
   const [user, setUser] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [channelJoined, setChannelJoined] = useState(false);
+
+  useEffect(() => {
+    const verifyChannelMembership = async (telegramId) => {
+      try {
+        const res = await fetch(`/api/verify-channel/${telegramId}`);
+        const data = await res.json();
+        setChannelJoined(data.isChannelMember);
+      } catch (err) {
+        console.error("Error verifying channel membership:", err);
+      }
+    };
+
+    const telegramId = localStorage.getItem("telegramId");
+    if (telegramId) {
+      verifyChannelMembership(telegramId);
+    }
+  }, []);
 
   useEffect(() => {
     const queryParams = new URLSearchParams(window.location.search);
@@ -61,7 +79,11 @@ const App = () => {
         {error && <p className="text-red-500">{error}</p>}
         {user && (
           <>
-            <SpinWheel spinsLeft={user.spins} handleSpin={handleSpin} />
+            <SpinWheel
+              spinsLeft={user.spins}
+              handleSpin={handleSpin}
+              channelJoined={channelJoined}
+            />
             <ReferralSection
               referralLink={`https://t.me/HackintownBot?start=${user.referralCode}`}
               totalEarnings={user.totalEarnings}
