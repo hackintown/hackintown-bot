@@ -14,11 +14,21 @@ const App = () => {
   useEffect(() => {
     const init = async () => {
       try {
-        const queryParams = new URLSearchParams(window.location.search);
-        const telegramId = queryParams.get("telegramId");
+        // Get Telegram WebApp data
+        const tgWebApp = window.Telegram?.WebApp;
+        if (!tgWebApp) {
+          setError("Please start from Telegram bot!");
+          setLoading(false);
+          return;
+        }
+
+        // Get user data from WebApp initData
+        const initData = tgWebApp.initData;
+        const initDataUnsafe = tgWebApp.initDataUnsafe;
+        const telegramId = initDataUnsafe?.user?.id?.toString();
 
         if (!telegramId) {
-          setError("Please start from Telegram bot!");
+          setError("Unable to get user data!");
           setLoading(false);
           return;
         }

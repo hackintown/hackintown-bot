@@ -63,15 +63,15 @@ bot.onText(/\/start(?:\s+(\w+))?/, async (msg, match) => {
     // Send welcome message
     const welcomeMessage = `Welcome to Spin and Win! 🎰\n\nJoin our channel and get 3 FREE spins! 🎁`;
 
+    const webAppUrl = `${process.env.CLIENT_URL}`;
+
     await bot.sendMessage(chatId, welcomeMessage, {
       reply_markup: {
         inline_keyboard: [
           [
             {
               text: "Start Playing 🎮",
-              web_app: {
-                url: `${process.env.CLIENT_URL}?id=${user.telegramId}`,
-              },
+              web_app: { url: webAppUrl },
             },
           ],
         ],

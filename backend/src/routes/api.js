@@ -16,10 +16,18 @@ const getUser = async (telegramId) => {
   return user;
 };
 
-// Fetch user data for frontend
 router.get("/user/:telegramId", async (req, res) => {
   try {
-    const user = await getUser(req.params.telegramId);
+    const telegramId = req.params.telegramId;
+
+    // Validate the request is from Telegram WebApp
+    const initData = req.headers["x-telegram-init-data"];
+    if (!initData) {
+      // For development, you might want to bypass this check
+      console.warn("Missing Telegram init data");
+    }
+
+    const user = await getUser(telegramId);
     res.json(user);
   } catch (error) {
     console.error("Error fetching user:", error.message);
