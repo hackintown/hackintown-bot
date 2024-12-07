@@ -1,8 +1,10 @@
 const TelegramBot = require("node-telegram-bot-api");
 const User = require("../models/User");
-const crypto = require("crypto");
+const crypto = require("crypto-browserify");
 
+// Environment variables
 const CHANNEL_USERNAME = process.env.CHANNEL_USERNAME || "@hackintown";
+const BOT_USERNAME = process.env.BOT_USERNAME || "HackintownBot";
 
 const bot = new TelegramBot(process.env.TELEGRAM_TOKEN, { polling: false });
 
@@ -46,7 +48,7 @@ bot.onText(/\/start(?: (.+))?/, async (msg, match) => {
 
     bot.sendMessage(
       chatId,
-      `Welcome to Spin & Win! 🎰\nYour referral link: https://t.me/yourBotUsername?start=${user.referralCode}`,
+      `Welcome to Spin & Win! 🎰\nYour referral link: https://t.me/${BOT_USERNAME}?start=${user.referralCode}`,
       {
         reply_markup: {
           inline_keyboard: [
