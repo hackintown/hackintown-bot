@@ -101,10 +101,23 @@ router.get("/verify-channel/:telegramId", async (req, res) => {
     }
 
     const isMember = await verifyMembership(req.params.telegramId);
-    user.channelJoined = isMember;
-    await user.save();
 
-    res.json({ isChannelMember: isMember });
+    if (isMember && !user.channelJoined) {
+      user.channelJoined = true;
+      if (user.spins === 0) user.spins = 3;
+      await user.save();
+
+      // Check referral if this is a referred user
+      if (user.referredBy) {
+        await checkAndRewardReferrer(user.telegramId);
+      }
+    }
+
+    res.json({
+      isChannelMember: isMember,
+      spins: user.spins,
+      totalEarnings: user.totalEarnings,
+    });
   } catch (error) {
     console.error("Error verifying channel membership:", error);
     res.status(500).json({ message: "Server error" });

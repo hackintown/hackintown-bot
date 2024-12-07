@@ -13,7 +13,10 @@ bot.on("error", (error) => {
   console.error("Telegram Bot Error:", error.message);
 });
 
-const generateReferralCode = () => crypto.randomBytes(4).toString("hex");
+const generateReferralCode = () => {
+  return crypto.randomBytes(4).toString("hex").substring(0, 8);
+};
+
 const generateUniqueReferralCode = async () => {
   let code;
   let exists;
@@ -91,42 +94,48 @@ const checkAndRewardReferrer = async (userId) => {
 
 bot.onText(/\/start(?: (.+))?/, async (msg, match) => {
   const chatId = msg.chat.id;
-  const referralCode = match ? match[1]?.replace(/[^\w-]/g, "") : null;
+  const referralCode = match ? match[1]?.trim() : null;
 
   try {
-    let user = await User.findOne({ telegramId: chatId });
+    let user = await User.findOne({ telegramId: String(chatId) });
     if (!user) {
+      const newReferralCode = await generateUniqueReferralCode();
       user = new User({
-        telegramId: chatId,
+        telegramId: String(chatId),
         username: msg.from.username || "",
-        referralCode: await generateUniqueReferralCode(),
+        referralCode: newReferralCode,
         spins: 3,
         channelJoined: false,
       });
 
       if (referralCode) {
-        await handleReferral(user, referralCode);
+        const referrer = await handleReferral(user, referralCode);
+        if (referrer) {
+          bot.sendMessage(
+            referrer.telegramId,
+            `🎉 New user joined using your referral link! You'll get a free spin when they join the channel.`
+          );
+        }
       }
 
       await user.save();
     }
 
-    // Welcome message with referral link
     const welcomeMessage = `
-        Welcome to Spin & Win! 🎰
+Welcome to Spin & Win! 🎰
 
-        ${referralCode ? "🎯 You were invited by a friend!" : ""}
-        Your unique referral link:
-        https://t.me/${BOT_USERNAME}?start=${user.referralCode}
+${referralCode ? "🎯 You were invited by a friend!" : ""}
+Your unique referral link:
+https://t.me/${BOT_USERNAME}?start=${user.referralCode}
 
-        Share this link with friends and earn 1 free spin for each friend who joins! 🎁
+Share this link with friends and earn 1 free spin for each friend who joins! 🎁
     `;
 
     bot.sendMessage(chatId, welcomeMessage, {
+      parse_mode: "HTML",
       reply_markup: {
         inline_keyboard: [
           [{ text: "🎮 Start Playing", callback_data: "start_playing" }],
-          [{ text: "📊 My Referrals", callback_data: "show_referrals" }],
         ],
       },
     });
@@ -221,24 +230,15 @@ https://t.me/${BOT_USERNAME}?start=${user.referralCode}
 });
 
 // Verify channel membership
-async function verifyMembership(chatId) {
+const verifyMembership = async (chatId) => {
   try {
-    const res = await bot.getChatMember(CHANNEL_USERNAME, chatId);
-    const isMember = ["member", "administrator", "creator"].includes(
-      res.status
-    );
-
-    if (isMember) {
-      // Check and reward referrer if this user was referred
-      await checkAndRewardReferrer(chatId);
-    }
-
-    return isMember;
-  } catch (err) {
-    console.error("Error verifying membership:", err);
+    const member = await bot.getChatMember(CHANNEL_USERNAME, chatId);
+    return ["member", "administrator", "creator"].includes(member.status);
+  } catch (error) {
+    console.error("Error verifying membership:", error);
     return false;
   }
-}
+};
 
 // Handle spinning logic
 const handleSpin = async (chatId, user) => {
