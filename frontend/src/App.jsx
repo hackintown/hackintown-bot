@@ -12,50 +12,42 @@ const App = () => {
   const [channelJoined, setChannelJoined] = useState(false);
 
   useEffect(() => {
-    const verifyChannelMembership = async (telegramId) => {
+    const init = async () => {
       try {
-        const res = await fetch(
+        const queryParams = new URLSearchParams(window.location.search);
+        const telegramId = queryParams.get("telegramId");
+
+        if (!telegramId) {
+          setError("Please start from Telegram bot!");
+          setLoading(false);
+          return;
+        }
+
+        // Fetch user data
+        const response = await fetch(`${API_BASE_URL}/api/user/${telegramId}`);
+        if (!response.ok) throw new Error("Failed to fetch user data");
+
+        const userData = await response.json();
+        setUser(userData);
+
+        // Check channel membership
+        const membershipResponse = await fetch(
           `${API_BASE_URL}/api/verify-channel/${telegramId}`
         );
-        const data = await res.json();
-        setChannelJoined(data.isChannelMember);
+        if (membershipResponse.ok) {
+          const { isChannelMember } = await membershipResponse.json();
+          setChannelJoined(isChannelMember);
+        }
       } catch (err) {
-        console.error("Error verifying channel membership:", err);
+        console.error("Initialization error:", err);
+        setError("Failed to load user data. Please try again.");
+      } finally {
+        setLoading(false);
       }
     };
 
-    const telegramId = localStorage.getItem("telegramId");
-    if (telegramId) {
-      verifyChannelMembership(telegramId);
-    }
+    init();
   }, []);
-
-  useEffect(() => {
-    const queryParams = new URLSearchParams(window.location.search);
-    const telegramId =
-      queryParams.get("telegramId") || localStorage.getItem("telegramId");
-
-    if (telegramId) {
-      localStorage.setItem("telegramId", telegramId); // Save for persistence
-      fetchUserData(telegramId);
-    } else {
-      setError("Telegram ID not found!");
-      setLoading(false);
-    }
-  }, []);
-
-  const fetchUserData = async (telegramId) => {
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/user/${telegramId}`);
-      if (!res.ok) throw new Error("Failed to fetch user data.");
-      const data = await res.json();
-      setUser(data);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleSpin = async (reward) => {
     try {

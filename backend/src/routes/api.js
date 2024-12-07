@@ -124,4 +124,36 @@ router.get("/verify-channel/:telegramId", async (req, res) => {
   }
 });
 
+// Add this to your existing routes
+router.post("/verify-membership", async (req, res) => {
+  try {
+    const { telegramId } = req.body;
+    const user = await User.findOne({ telegramId });
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const member = await bot.getChatMember(CHANNEL_USERNAME, telegramId);
+    const isChannelMember = ["member", "administrator", "creator"].includes(
+      member.status
+    );
+
+    if (isChannelMember && !user.channelJoined) {
+      user.channelJoined = true;
+      if (user.spins === 0) user.spins = 3;
+      await user.save();
+    }
+
+    res.json({
+      isChannelMember,
+      spins: user.spins,
+      totalEarnings: user.totalEarnings,
+    });
+  } catch (error) {
+    console.error("Membership verification error:", error);
+    res.status(500).json({ error: "Verification failed" });
+  }
+});
+
 module.exports = router;

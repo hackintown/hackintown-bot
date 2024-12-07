@@ -4,6 +4,19 @@ import { Wheel } from "react-custom-roulette";
 const SpinWheel = ({ spinsLeft, handleSpin, channelJoined }) => {
   const [spinning, setSpinning] = useState(false);
   const [showJoinPrompt, setShowJoinPrompt] = useState(!channelJoined);
+  const [prizeIndex, setPrizeIndex] = useState(0);
+
+  // Add wheel data
+  const data = [
+    { option: "10" },
+    { option: "20" },
+    { option: "30" },
+    { option: "40" },
+    { option: "50" },
+    { option: "25" },
+    { option: "35" },
+    { option: "45" },
+  ];
 
   useEffect(() => {
     setShowJoinPrompt(!channelJoined);
@@ -15,21 +28,14 @@ const SpinWheel = ({ spinsLeft, handleSpin, channelJoined }) => {
       return;
     }
 
-    if (spinsLeft <= 0) return;
+    if (spinsLeft <= 0 || spinning) return;
+
     setSpinning(true);
-
-    // Calculate reward based on spins left
-    const ranges = {
-      3: { min: 30, max: 50 },
-      2: { min: 20, max: 35 },
-      1: { min: 10, max: 20 },
-    };
-
-    const range = ranges[spinsLeft] || ranges[1];
-    const reward =
-      Math.floor(Math.random() * (range.max - range.min + 1)) + range.min;
+    const newPrizeIndex = Math.floor(Math.random() * data.length);
+    setPrizeIndex(newPrizeIndex);
 
     setTimeout(() => {
+      const reward = parseInt(data[newPrizeIndex].option);
       handleSpin(reward);
       setSpinning(false);
     }, 4000);
