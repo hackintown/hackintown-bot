@@ -36,16 +36,24 @@ bot.onText(/\/start(?:\s+(\w+))?/, async (msg, match) => {
       });
       await user.save();
 
-      // Handle referral if exists
+      // Store referral information if referral code exists
       if (referralCode) {
         const referrer = await User.findOne({ referralCode });
-        if (referrer) {
-          referrer.referralStats.referredUsers.push({
-            userId: user.telegramId,
-            username: user.username,
-            joinedAt: new Date(),
-          });
-          await referrer.save();
+        if (referrer && referrer.telegramId !== String(chatId)) {
+          // Check if user is not referring themselves
+          const alreadyReferred = referrer.referralStats.referredUsers.some(
+            (ref) => ref.userId === String(chatId)
+          );
+
+          if (!alreadyReferred) {
+            referrer.referralStats.referredUsers.push({
+              userId: String(chatId),
+              username: msg.from.username,
+              joinedAt: new Date(),
+              rewarded: false, // Will be set to true when user joins channel
+            });
+            await referrer.save();
+          }
         }
       }
     }
@@ -54,8 +62,21 @@ bot.onText(/\/start(?:\s+(\w+))?/, async (msg, match) => {
     const isChannelMember = await verifyChannelMembership(chatId);
     if (isChannelMember !== user.channelJoined) {
       user.channelJoined = isChannelMember;
-      if (isChannelMember && user.spins === 0) {
-        user.spins = 3; // Give 3 free spins when joining channel
+      if (isChannelMember) {
+        if (user.spins === 0) {
+          user.spins = 3; // Give 3 free spins when joining channel
+        }
+        // Process referral reward if user was referred
+        if (referralCode) {
+          const referrer = await User.findOne({ referralCode });
+          if (referrer) {
+            // Trigger referral reward
+            await bot.sendMessage(
+              referrer.telegramId,
+              `🎉 You earned 1 spin! Your referred user @${user.username} joined the channel.`
+            );
+          }
+        }
       }
       await user.save();
     }

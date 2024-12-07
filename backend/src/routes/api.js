@@ -3,6 +3,7 @@ const User = require("../models/User");
 const Joi = require("joi");
 const { verifyMembership } = require("../utils/telegram");
 const router = express.Router();
+const cache = require("../utils/cache");
 
 // Base route to verify API status
 router.get("/", (req, res) => {
@@ -103,22 +104,26 @@ router.post("/withdraw", async (req, res) => {
 // Add to existing routes
 router.get("/verify-channel/:telegramId", async (req, res) => {
   try {
-    const user = await User.findOne({ telegramId: req.params.telegramId });
+    const telegramId = req.params.telegramId;
+    const cacheKey = `channel_member_${telegramId}`;
+
+    // Check cache first
+    let isMember = cache.get(cacheKey);
+
+    if (isMember === undefined) {
+      isMember = await verifyMembership(telegramId);
+      cache.set(cacheKey, isMember);
+    }
+
+    const user = await User.findOne({ telegramId });
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
-
-    const isMember = await verifyMembership(req.params.telegramId);
 
     if (isMember && !user.channelJoined) {
       user.channelJoined = true;
       if (user.spins === 0) user.spins = 3;
       await user.save();
-
-      // Check referral if this is a referred user
-      if (user.referredBy) {
-        await checkAndRewardReferrer(user.telegramId);
-      }
     }
 
     res.json({
@@ -161,6 +166,52 @@ router.post("/verify-membership", async (req, res) => {
   } catch (error) {
     console.error("Membership verification error:", error);
     res.status(500).json({ error: "Verification failed" });
+  }
+});
+
+router.post("/referral-reward", async (req, res) => {
+  try {
+    const { referrerId, referredId } = req.body;
+
+    const referrer = await User.findOne({ telegramId: referrerId });
+    const referred = await User.findOne({ telegramId: referredId });
+
+    if (!referrer || !referred) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Check if referred user has joined the channel
+    if (!referred.channelJoined) {
+      return res.status(400).json({
+        message: "Referred user must join the channel first",
+      });
+    }
+
+    // Check if referral reward already given
+    const existingReferral = referrer.referralStats.referredUsers.find(
+      (user) => user.userId === referredId && user.rewarded
+    );
+
+    if (!existingReferral) {
+      // Add 1 spin to referrer
+      referrer.spins += 1;
+
+      // Update referral status
+      const referralIndex = referrer.referralStats.referredUsers.findIndex(
+        (user) => user.userId === referredId
+      );
+
+      if (referralIndex !== -1) {
+        referrer.referralStats.referredUsers[referralIndex].rewarded = true;
+      }
+
+      await referrer.save();
+    }
+
+    res.json({ success: true, spins: referrer.spins });
+  } catch (error) {
+    console.error("Error processing referral reward:", error);
+    res.status(500).json({ message: "Server error" });
   }
 });
 

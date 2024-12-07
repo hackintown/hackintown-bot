@@ -5,6 +5,7 @@ const SpinWheel = ({ spinsLeft, handleSpin, channelJoined }) => {
   const [spinning, setSpinning] = useState(false);
   const [showJoinPrompt, setShowJoinPrompt] = useState(!channelJoined);
   const [prizeIndex, setPrizeIndex] = useState(0);
+  const [verifying, setVerifying] = useState(false);
 
   // Add wheel data
   const data = [
@@ -18,8 +19,35 @@ const SpinWheel = ({ spinsLeft, handleSpin, channelJoined }) => {
     { option: "45" },
   ];
 
+  // Add continuous channel verification
   useEffect(() => {
-    setShowJoinPrompt(!channelJoined);
+    const verifyChannel = async () => {
+      if (!channelJoined) {
+        setVerifying(true);
+        try {
+          const tgWebApp = window.Telegram?.WebApp;
+          const telegramId = tgWebApp?.initDataUnsafe?.user?.id?.toString();
+
+          if (telegramId) {
+            const response = await fetch(
+              `${API_BASE_URL}/api/verify-channel/${telegramId}`
+            );
+            const data = await response.json();
+
+            if (data.isChannelMember) {
+              setShowJoinPrompt(false);
+            }
+          }
+        } catch (error) {
+          console.error("Channel verification error:", error);
+        } finally {
+          setVerifying(false);
+        }
+      }
+    };
+
+    const interval = setInterval(verifyChannel, 5000); // Check every 5 seconds
+    return () => clearInterval(interval);
   }, [channelJoined]);
 
   const handleSpinClick = () => {
@@ -44,16 +72,25 @@ const SpinWheel = ({ spinsLeft, handleSpin, channelJoined }) => {
   if (showJoinPrompt) {
     return (
       <div className="text-center p-6 bg-white rounded-lg shadow-md">
-        <h2 className="text-xl font-bold mb-4">Join our Channel to Start!</h2>
+        <h2 className="text-xl font-bold mb-4">
+          {verifying ? "Verifying..." : "Join our Channel to Start!"}
+        </h2>
         <p className="mb-4">Get 3 FREE spins when you join our channel</p>
-        <a
-          href="https://t.me/hackintown"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="bg-blue-500 text-white px-6 py-2 rounded-full inline-block mb-4 hover:bg-blue-600"
-        >
-          Join Channel
-        </a>
+        <div className="space-y-4">
+          <a
+            href="https://t.me/hackintown"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-blue-500 text-white px-6 py-2 rounded-full inline-block hover:bg-blue-600"
+          >
+            Join Channel
+          </a>
+          {verifying && (
+            <p className="text-sm text-gray-600">
+              Checking membership status...
+            </p>
+          )}
+        </div>
       </div>
     );
   }
